@@ -3,7 +3,7 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import CallbackContext, CommandHandler, Updater, MessageHandler, Filters
 from transitions import Machine
-
+from config import BOT_TOKEN
 from statemachine import States, transitions
 
 
@@ -42,7 +42,7 @@ def ask_for_payment_method(update: Update, context: CallbackContext):
 
         reply_keyboard = [[CASH, CREDIT_CARD]]
         update.message.reply_text(
-            'Как вы будете платить??',
+            'Как Вы будете платить?',
             reply_markup=ReplyKeyboardMarkup(
                 reply_keyboard, one_time_keyboard=True, input_field_placeholder=f'{CASH} или {CREDIT_CARD}'
             ),
@@ -78,7 +78,7 @@ def thank_client(update: Update, context: CallbackContext):
 
 
 def main():
-    updater = Updater(TOKEN)
+    updater = Updater(BOT_TOKEN)
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
