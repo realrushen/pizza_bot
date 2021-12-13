@@ -17,16 +17,16 @@ CREDIT_CARD = 'Карта'
 YES = 'Да'
 NO = 'Нет'
 
-# dict keys
+# Dict keys
 SIZE = 'size'
 MACHINE = 'machine'
 NEW_ORDER_FLAG = 'new_order_started'
 PAYMENT_METHOD = 'payment_method'
 
-# commands
+# Commands
 START = 'start'
 
-# setup logging
+# Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,7 +138,6 @@ def main():
     # Start the Bot
 
     updater.start_polling()
-
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
