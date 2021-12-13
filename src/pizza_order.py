@@ -1,6 +1,9 @@
+
+
+
 from transitions import Machine
 
-from statemachine import States
+from .statemachine import States
 
 
 class PizzaOrder:
@@ -38,7 +41,7 @@ class PizzaOrder:
     def size(self):
         return self._size
 
-    @property.setter
+    @size.setter
     def size(self, value):
         self._size = value
 
@@ -46,7 +49,7 @@ class PizzaOrder:
     def payment_method(self):
         return self._payment_method
 
-    @property.setter
+    @payment_method.setter
     def payment_method(self, value):
         self._payment_method = value
 
