@@ -1,9 +1,6 @@
-
-
-
 from transitions import Machine
 
-from .statemachine import States
+from statemachine import States
 
 
 class PizzaOrder:
@@ -13,7 +10,7 @@ class PizzaOrder:
         self._confirmed: bool = None
 
         # Initially we start from asking for size state
-        self.machine = Machine(self, states=States, initial=States.SIZE)
+        self.machine = Machine(self, states=States, initial=States.SIZE, ignore_invalid_triggers=True)
         # We don't change state until we don't get pizza size
         self.machine.add_transition(
             trigger='ask_for_payment_method',
@@ -34,8 +31,18 @@ class PizzaOrder:
             source=States.ACKNOWLEDGEMENT,
             dest=States.ACCEPTED,
             conditions=['is_confirmed'],
-
         )
+        # We confirm order only in States.ACKNOWLEDGEMENT state
+        self.machine.add_transition(
+            trigger='confirm',
+            source=States.ACKNOWLEDGEMENT,
+            dest=None,
+            after='_confirm'
+        )
+
+    def __repr__(self):
+        name = type(self).__name__
+        return f'{name}(size={self.size}, payment_method={self._payment_method})'
 
     @property
     def size(self):
@@ -69,5 +76,5 @@ class PizzaOrder:
     def is_confirmed(self):
         return self._confirmed
 
-    def confirm(self):
+    def _confirm(self):
         self._confirmed = True

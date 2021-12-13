@@ -1,11 +1,11 @@
 import logging
+from typing import Optional
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import CallbackContext, CommandHandler, Updater, MessageHandler, Filters
-from transitions import Machine
 
 from config import BOT_TOKEN
-from statemachine import States, transitions
+from pizza_order import PizzaOrder
 
 # Constants
 
@@ -18,10 +18,7 @@ YES = 'Да'
 NO = 'Нет'
 
 # Dict keys
-SIZE = 'size'
-MACHINE = 'machine'
-NEW_ORDER_FLAG = 'new_order_started'
-PAYMENT_METHOD = 'payment_method'
+PIZZA_ORDER = 'pizza_order'
 
 # Commands
 START = 'start'
@@ -32,19 +29,18 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-def get_state_machine(update: Update, context: CallbackContext):
+def get_pizza_order(update: Update, context: CallbackContext) -> Optional[PizzaOrder]:
     try:
-        machine = context.chat_data[MACHINE]
+        pizza_order = context.chat_data[PIZZA_ORDER]
     except KeyError:
         update.message.reply_text('Для заказа пиццы используйте команду /start')
         return None
-    return machine
+    return pizza_order
 
 
-def start(update: Update, context: CallbackContext):
+def start(update: Update, context: CallbackContext) -> None:
     """Starts the conversation and asks the user about pizza size."""
-    context.chat_data[MACHINE] = Machine(states=States, transitions=transitions, initial=States.SIZE)
-    context.chat_data[NEW_ORDER_FLAG] = True
+    context.chat_data[PIZZA_ORDER] = PizzaOrder()
 
     reply_keyboard = [[BIG, SMALL]]
     update.message.reply_text(
@@ -61,12 +57,14 @@ def ask_for_payment_method(update: Update, context: CallbackContext):
     """Stores  pizza size in context.chat_data dictionary.
     Asks user about payment method and changes finite state
     machine state to States.PAYMENT_METHOD"""
-    machine = get_state_machine(update, context)
-    if not machine:
+    pizza_order = get_pizza_order(update, context)
+    if not pizza_order:
         return
-    if machine.is_SIZE() and context.chat_data[NEW_ORDER_FLAG]:
-        context.chat_data[SIZE] = update.message.text
-        machine.ask_for_payment_method()
+
+    if not pizza_order.is_filled:
+        # store size and trigger transition
+        pizza_order.size = update.message.text
+        pizza_order.trigger('ask_for_payment_method')
 
         reply_keyboard = [[CASH, CREDIT_CARD]]
         update.message.reply_text(
@@ -81,18 +79,18 @@ def ask_for_payment_method(update: Update, context: CallbackContext):
 
 def confirm_order(update: Update, context: CallbackContext):
     """"""
-    machine = get_state_machine(update, context)
-    if not machine:
+    pizza_order = get_pizza_order(update, context)
+    if not pizza_order:
         return
-    if machine.is_PAYMENT_METHOD():
-        size = context.chat_data.get(SIZE)
-        payment_method = update.message.text
-        context.chat_data[PAYMENT_METHOD] = payment_method
 
-        machine.confirm_order()
+    if pizza_order.is_size_filled:
+        pizza_order.payment_method = update.message.text
+        pizza_order.trigger('confirm_order')
 
+        size = pizza_order.size
         reply_keyboard = [[YES, NO]]
-        confirmation_text = f'Вы хотите {size} пиццу, оплата - {payment_method}?'
+        confirmation_text = f'Вы хотите {pizza_order.size} пиццу,' \
+                            f' оплата - {pizza_order.payment_method}?'
         update.message.reply_text(
             confirmation_text,
             reply_markup=ReplyKeyboardMarkup(
@@ -104,25 +102,25 @@ def confirm_order(update: Update, context: CallbackContext):
 
 
 def thank_client(update: Update, context: CallbackContext):
-    machine = get_state_machine(update, context)
-    if not machine:
+    pizza_order = get_pizza_order(update, context)
+    if not pizza_order:
         return
-    if machine.is_ACKNOWLEDGEMENT() and update.message.text == NO:
-        machine.reset()
-        return start(update, context)
-    elif machine.is_ACKNOWLEDGEMENT() and update.message.text == YES:
-        update.message.reply_text('Спасибо за заказ')
-        context.chat_data[NEW_ORDER_FLAG] = False
 
-        # client sensitive data must be masked in production
+    if update.message.text == YES:
+        pizza_order.confirm()
+
+    if pizza_order.trigger('thank_user'):
+        update.message.reply_text('Спасибо за заказ')
+
+        # TODO:client sensitive personal data must be masked in production
         logger.info(
-            'New Order(size=%s, payment_method=%s), chat_id=%s, user_id=%s',
-            context.chat_data.get(SIZE),
-            context.chat_data[PAYMENT_METHOD],
+            '%s, chat_id=%s, user_id=%s',
+            pizza_order,
             update.message.from_user.id,
             update.message.chat.id,
         )
-        machine.reset()
+    else:
+        return start(update, context)
 
 
 def main():
